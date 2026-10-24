@@ -1,0 +1,6 @@
+{
+  "name": "Phone",
+  "description": "An iPhone-inspired Android dialer featuring an iOS keypad, contacts, favorites, recents, carrier voicemail fallback, and a PIN-protected private voicemail vault.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
