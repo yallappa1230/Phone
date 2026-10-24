@@ -1,5 +1,5 @@
 
-name: Build Phone Dialer APK
+name: Build iPhone Style Phone Dialer APK
 
 on:
   push:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build iPhone Style Dialer
+    name: Build Phone Dialer APK
     runs-on: ubuntu-latest
 
     steps:
@@ -36,10 +36,12 @@ jobs:
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
           yes | sdkmanager --licenses
 
-      - name: Check Android project
+      - name: Check Android project files
         run: |
           echo "Checking project files..."
           ls -la
+          find app -maxdepth 5 -type f | sort || true
+
           test -f settings.gradle.kts || test -f settings.gradle
           test -f build.gradle.kts || test -f build.gradle
           test -f app/build.gradle.kts || test -f app/build.gradle
@@ -59,22 +61,23 @@ jobs:
 
       - name: Build Phone Dialer APK
         run: |
-          ./gradlew --no-daemon :app:assembleDebug --stacktrace
+          ./gradlew --no-daemon :app:assembleDebug --stacktrace --info
 
       - name: Verify APK
+        if: success()
         run: |
           APK="$(find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)"
           if [ -z "$APK" ]; then
-            echo "ERROR: APK was not generated"
+            echo "ERROR: APK was not generated."
             exit 1
           fi
           echo "APK created: $APK"
 
       - name: Upload Phone Dialer APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: iPhone-Style-Phone-Dialer-APK
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 7
-          
