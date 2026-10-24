@@ -1,19 +1,18 @@
-
-name: Build iPhone Style Phone Dialer APK
+name: Build iPhone Style Android Dialer
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
       - master
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build Phone Dialer APK
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -27,59 +26,58 @@ jobs:
           java-version: "17"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          packages: platform-tools
+        uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK packages
-        run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
-          yes | sdkmanager --licenses
-
-      - name: Set up Gradle
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.11.1"
+          gradle-version: "9.3.1"
 
-      - name: Generate Gradle wrapper
+      - name: Prepare Android Build Files & Wrapper
         run: |
-          if [ ! -f gradlew ]; then
-            gradle wrapper --gradle-version 8.11.1
+          # 1. Create .env if missing
+          if [ ! -f .env ]; then
+            if [ -f .env.example ]; then
+              cp .env.example .env
+            else
+              touch .env
+            fi
           fi
-          chmod +x gradlew
 
-      - name: Generate debug keystore
-        run: |
-          keytool -genkeypair \
-            -keystore debug.keystore \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass android \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
-
-      - name: Build Phone Dialer APK
-        run: |
-          ./gradlew --no-daemon :app:assembleDebug --stacktrace --info
-
-      - name: Verify APK
-        if: success()
-        run: |
-          APK="$(find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)"
-          if [ -z "$APK" ]; then
-            echo "ERROR: APK was not generated."
-            exit 1
+          # 2. Restore or create debug.keystore
+          if [ -f debug.keystore.base64 ]; then
+            echo "Restoring debug.keystore from base64..."
+            base64 -d debug.keystore.base64 > debug.keystore
+          elif [ ! -f debug.keystore ]; then
+            echo "Generating new debug.keystore..."
+            keytool -genkey -v -keystore debug.keystore -storepass android \
+              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+              -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
-          echo "APK created: $APK"
 
-      - name: Upload Phone Dialer APK
-        if: success()
+          # 3. Auto-generate gradlew and wrapper jar if missing in repository
+          if [ ! -f gradlew ] || [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Gradle wrapper missing from repository. Auto-generating wrapper..."
+            gradle wrapper --gradle-version 9.3.1
+          fi
+
+          chmod +x ./gradlew
+
+      - name: Validate Gradle
+        run: ./gradlew --version
+
+      - name: Build debug APK
+        run: ./gradlew --no-daemon :app:assembleDebug --stacktrace
+
+      - name: Verify APK was created
+        run: |
+          find app/build/outputs/apk/debug -name "*.apk" -type f
+          test -n "$(find app/build/outputs/apk/debug -name "*.apk" -type f -print -quit)"
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: iPhone-Style-Phone-Dialer-APK
+          name: iphone-style-dialer-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-          retention-days: 7
-          
+          retention-days: 14
